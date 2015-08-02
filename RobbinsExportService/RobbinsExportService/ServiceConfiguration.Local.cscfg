@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ServiceConfiguration serviceName="RobbinsExportService" xmlns="http://schemas.microsoft.com/ServiceHosting/2008/10/ServiceConfiguration" osFamily="4" osVersion="*" schemaVersion="2014-06.2.4">
+  <Role name="RobbinsDataExportService">
+    <Instances count="1" />
+    <ConfigurationSettings>
+      <Setting name="SourceDatabaseConnectionString" value="Data Source=tcp:robbinssqlazure.database.windows.net,1433;Initial Catalog=RobbinsQATest;User ID=RobbinsAdmin@robbinssqlazure;Password=P@ssw0rd@100;Connection Timeout=60;MultipleActiveResultSets=True;"/>
+      <Setting name="TargetDatabaseConnectionString" value="Data Source=tcp:robbinssqlazure.database.windows.net,1433;Initial Catalog=Robbins_QA_Replica_1;User ID=RobbinsAdmin@robbinssqlazure;Password=P@ssw0rd@100;Connection Timeout=60;MultipleActiveResultSets=True;"/>
+      <Setting name="TablesForHistoricLoad" value="UserOffers,GeneralUsers,GeneralUserSettings,Devices,Accounts,VehiclesV2,FavouriteLocations,Reminders,ReminderTypes,Location,UserMotoristTypes,Promotions,Countries,Languages,UnitsOfMeasurements,UserTypes,Genders,Applications"/>
+      <Setting name="TablesForDeltaLoad" value="UserOffers,UserSurvey,TermsAndConditionsV2,DeviceUserApplicationLog,GeneralUsers,GeneralUserSettings,Devices,Accounts,VehiclesV2,FavouriteLocations,Reminders,DashboardOrderLogs,UserMotoristTypes,Promotions"/>
+      <Setting name="HistoricLoadInterval" value="1440"/>
+      <Setting name="DeltaLoadInterval" value="1440"/>
+      <Setting name="EncryptionCert" value="7B73182CAA080D466244DC2720CF3CC4B461B7CF" />
+    </ConfigurationSettings>
+    <Certificates>
+      <Certificate name="EncryptionCert" thumbprint="7B73182CAA080D466244DC2720CF3CC4B461B7CF" thumbprintAlgorithm="sha1" />
+    </Certificates>
+  </Role>
+</ServiceConfiguration>

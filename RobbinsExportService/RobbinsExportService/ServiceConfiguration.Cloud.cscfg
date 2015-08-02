@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ServiceConfiguration serviceName="RobbinsExportService" xmlns="http://schemas.microsoft.com/ServiceHosting/2008/10/ServiceConfiguration" osFamily="4" osVersion="*" schemaVersion="2014-06.2.4">
+  <Role name="RobbinsDataExportService">
+    <Instances count="1" />
+    <ConfigurationSettings>
+        <Setting name="SourceDatabaseConnectionString" value="Server=tcp:robbinssqlazure.database.windows.net,1433;Database=RobbinsQATest;User ID=RobbinsAdmin@robbinssqlazure;Password=P@ssw0rd@100;Trusted_Connection=False;Encrypt=True;Connection Timeout=30;"/>
+        <Setting name="TargetDatabaseConnectionString" value="Server=tcp:robbinssqlazure.database.windows.net,1433;Database=RobbinsQADestination;User ID=RobbinsAdmin@robbinssqlazure;Password=P@ssw0rd@100;Trusted_Connection=False;Encrypt=True;Connection Timeout=30;"/>
+        <Setting name="TablesForHistoricLoad" value="DeviceUserApplicationLog, TermsAndConditionsV2, UserOffers, UserSurvey, GeneralUsers, GeneralUserSettings, Devices, Accounts, VehiclesV2, FavouriteLocations, Reminders, DashboardOrderLogs, UserMotoristTypes, Promotions, UserApplications"/>
+        <Setting name="TablesForDeltaLoad" value="Accounts,Devices,DeviceUserApplicationLog,FavouriteLocations,GeneralUsers,GeneralUserSettings,Reminders,TermsAndConditionsV2,UserApplications,UserMotoristTypes,UserOffers,VehiclesV2" />
+        <Setting name="HistoricLoadInterval" value="1440"/>
+        <Setting name="DeltaLoadInterval" value="1440"/>
+        <Setting name="EncryptionCert" value="7B73182CAA080D466244DC2720CF3CC4B461B7CF" />
+    </ConfigurationSettings>
+    <Certificates>
+      <Certificate name="EncryptionCert" thumbprint="7B73182CAA080D466244DC2720CF3CC4B461B7CF" thumbprintAlgorithm="sha1" />
+    </Certificates>
+  </Role>
+</ServiceConfiguration>

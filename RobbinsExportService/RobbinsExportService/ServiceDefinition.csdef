@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ServiceDefinition name="RobbinsExportService" xmlns="http://schemas.microsoft.com/ServiceHosting/2008/10/ServiceDefinition" schemaVersion="2014-06.2.4">
+  <WorkerRole name="RobbinsDataExportService" vmsize="Small">
+    <ConfigurationSettings>
+      <Setting name="SourceDatabaseConnectionString" />
+      <Setting name="TargetDatabaseConnectionString" />
+      <Setting name="TablesForHistoricLoad" />
+      <Setting name="TablesForDeltaLoad" />
+      <Setting name="HistoricLoadInterval" />
+      <Setting name="DeltaLoadInterval" />
+      <Setting name="EncryptionCert" />
+    </ConfigurationSettings>
+    <Certificates>
+      <Certificate name="EncryptionCert" storeLocation="LocalMachine" storeName="My" />
+      <Certificate name="EncryptionCert" storeLocation="LocalMachine" storeName="TrustedPeople" />
+    </Certificates>
+  </WorkerRole>
+</ServiceDefinition>
