@@ -3,13 +3,14 @@
   <Role name="RobbinsDataExportService">
     <Instances count="1" />
     <ConfigurationSettings>
-        <Setting name="SourceDatabaseConnectionString" value="Server=tcp:robbinssqlazure.database.windows.net,1433;Database=RobbinsQATest;User ID=RobbinsAdmin@robbinssqlazure;Password=P@ssw0rd@100;Trusted_Connection=False;Encrypt=True;Connection Timeout=30;"/>
-        <Setting name="TargetDatabaseConnectionString" value="Server=tcp:robbinssqlazure.database.windows.net,1433;Database=RobbinsQADestination;User ID=RobbinsAdmin@robbinssqlazure;Password=P@ssw0rd@100;Trusted_Connection=False;Encrypt=True;Connection Timeout=30;"/>
-        <Setting name="TablesForHistoricLoad" value="DeviceUserApplicationLog, TermsAndConditionsV2, UserOffers, UserSurvey, GeneralUsers, GeneralUserSettings, Devices, Accounts, VehiclesV2, FavouriteLocations, Reminders, DashboardOrderLogs, UserMotoristTypes, Promotions, UserApplications"/>
-        <Setting name="TablesForDeltaLoad" value="Accounts,Devices,DeviceUserApplicationLog,FavouriteLocations,GeneralUsers,GeneralUserSettings,Reminders,TermsAndConditionsV2,UserApplications,UserMotoristTypes,UserOffers,VehiclesV2" />
-        <Setting name="HistoricLoadInterval" value="1440"/>
-        <Setting name="DeltaLoadInterval" value="1440"/>
-        <Setting name="EncryptionCert" value="7B73182CAA080D466244DC2720CF3CC4B461B7CF" />
+      <Setting name="SourceDatabaseConnectionString" value="Data Source=tcp:robbinssqlazure.database.windows.net,1433;Initial Catalog=RobbinsQATest;User ID=RobbinsAdmin@robbinssqlazure;Password=P@ssw0rd@100;Connection Timeout=60;MultipleActiveResultSets=True;"/>
+      <Setting name="TargetDatabaseConnectionString" value="Data Source=tcp:robbinssqlazure.database.windows.net,1433;Initial Catalog=Robbins_QA_Replica_1;User ID=RobbinsAdmin@robbinssqlazure;Password=P@ssw0rd@100;Connection Timeout=60;MultipleActiveResultSets=True;"/>
+      <Setting name="TablesForHistoricLoad" value="UserOffers,GeneralUsers,GeneralUserSettings,Devices,Accounts,VehiclesV2,FavouriteLocations,Reminders,ReminderTypes,Location,UserMotoristTypes,Promotions,Countries,Languages,UnitsOfMeasurements,UserTypes,Genders,Applications"/>
+      <Setting name="TablesForDeltaLoad" value="UserOffers,UserSurvey,TermsAndConditionsV2,DeviceUserApplicationLog,GeneralUsers,GeneralUserSettings,Devices,Accounts,VehiclesV2,FavouriteLocations,Reminders,DashboardOrderLogs,UserMotoristTypes,Promotions"/>
+      <Setting name="RoleInterval" value="10000"/>
+      <Setting name="DeltaLoadInterval" value="20"/>
+      <Setting name ="MaxParallelProcessCount" value="4"/>
+      <Setting name="EncryptionCert" value="7B73182CAA080D466244DC2720CF3CC4B461B7CF" />
     </ConfigurationSettings>
     <Certificates>
       <Certificate name="EncryptionCert" thumbprint="7B73182CAA080D466244DC2720CF3CC4B461B7CF" thumbprintAlgorithm="sha1" />

@@ -6,8 +6,9 @@
       <Setting name="TargetDatabaseConnectionString" />
       <Setting name="TablesForHistoricLoad" />
       <Setting name="TablesForDeltaLoad" />
-      <Setting name="HistoricLoadInterval" />
+      <Setting name="RoleInterval" />
       <Setting name="DeltaLoadInterval" />
+      <Setting name ="MaxParallelProcessCount" />
       <Setting name="EncryptionCert" />
     </ConfigurationSettings>
     <Certificates>

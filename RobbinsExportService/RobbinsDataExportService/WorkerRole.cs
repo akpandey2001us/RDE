@@ -23,7 +23,7 @@ namespace RobbinsDataExportService
 		private List<string> fullLoadTables = new List<string>();
 		private List<string> deltaLoadTables = new List<string>();
 		private List<string> entities = new List<string>();
-        private int maxParallelThread = 1;
+        private int maxParallelThread = -1;
 
 		public override void Run()
 		{
@@ -50,6 +50,8 @@ namespace RobbinsDataExportService
 			bool result = base.OnStart();
 
 			Trace.TraceInformation("RobbinsDataExportService has been started");
+
+            this.maxParallelThread = Convert.ToInt32(CloudConfigurationManager.GetSetting("MaxParallelProcessCount"));
 
 			fullLoadTables.AddRange(CloudConfigurationManager.GetSetting("TablesForHistoricLoad").Split(new char[] { ',' }));
 			deltaLoadTables.AddRange(CloudConfigurationManager.GetSetting("TablesForDeltaLoad").Split(new char[] { ',' }));
@@ -88,25 +90,21 @@ namespace RobbinsDataExportService
 
 		private async Task RunAsync(CancellationToken cancellationToken)
 		{
-			// TODO: Replace the following with your own logic. Convert.ToInt32(CloudConfigurationManager.GetSetting("HistoricLoadInterval"))
 			while (!cancellationToken.IsCancellationRequested)
 			{
 				Trace.TraceInformation("Working");
-				await Task.Delay(10000);
+                await Task.Delay(Convert.ToInt32(CloudConfigurationManager.GetSetting("RoleInterval")));
+                
+				Trace.WriteLine("Running historic load at " + DateTime.Now);
+				var lastStatusCode = businessLayer.GetLastColumnValueFromLoadStatus("Load_Status_Code");
 
-				if (this.TimeDiff() == 10)
+				if (lastStatusCode == "B" || lastStatusCode == "S")
 				{
-					Trace.WriteLine("Running historic load at " + DateTime.Now);
-					var lastStatusCode = businessLayer.GetLastColumnValueFromLoadStatus("Load_Status_Code");
-
-					if (lastStatusCode == "B" || lastStatusCode == "S")
-					{
-						this.DeltaLoad();
-					}
-					else
-					{
-						this.InitialLoad();
-					}
+					this.DeltaLoad();
+				}
+				else
+				{
+					this.InitialLoad();
 				}
 
 				// 1. Run Historic load on ad-hoc basis
@@ -114,12 +112,9 @@ namespace RobbinsDataExportService
 			}
 		}
 
-		private int TimeDiff(string loadType = "historic")
-		{
-			TimeSpan varTime = DateTime.Now - businessLayer.GetLastHistoricLoadDateTime();
-			return varTime.Minutes;
-		}
-
+        /// <summary>
+        /// Initial Load from Robbins database to Robbins replica
+        /// </summary>
 		private void InitialLoad()
 		{
 			// Log into Load Status table
@@ -171,6 +166,9 @@ namespace RobbinsDataExportService
 			businessLayer.UpdateLoadStatusLog(DateTime.Now, 'S', 'H', loadId);
 		}
 
+        /// <summary>
+        /// Data load with delta changes
+        /// </summary>
 		private void DeltaLoad()
 		{
 			var load_First_CT_Version = Convert.ToInt32(businessLayer.GetLastColumnValueFromLoadStatus("Load_First_CT_Version"));
@@ -232,7 +230,7 @@ namespace RobbinsDataExportService
 			}
 
 			// 3. Update the load_status_details table
-			businessLayer.UpdateLoadStatusLog(DateTime.Now, 'S', delta == true ? 'D': 'F', loadId);
+			businessLayer.UpdateLoadStatusLog(DateTime.Now, 'S', delta == true ? 'D': 'H', loadId);
 		}
 	}
 }
