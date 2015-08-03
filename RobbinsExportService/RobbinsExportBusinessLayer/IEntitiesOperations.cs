@@ -8,7 +8,7 @@ namespace RobbinsExportBusinessLayer
         List<string> GetAllEntities();
         bool IsTableExists(string tableName, string connectionString);
         void CreateEntity(string tableName);
-        DataTable GetEntityWithData(string tableName, string loadType = "F");
+        DataTable GetEntityWithData(string tableName);
         bool TruncateEntity(string tableName);
     }
 }

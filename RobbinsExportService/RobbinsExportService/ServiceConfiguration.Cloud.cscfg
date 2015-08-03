@@ -7,8 +7,7 @@
       <Setting name="TargetDatabaseConnectionString" value="Data Source=tcp:robbinssqlazure.database.windows.net,1433;Initial Catalog=Robbins_QA_Replica_1;User ID=RobbinsAdmin@robbinssqlazure;Password=P@ssw0rd@100;Connection Timeout=60;MultipleActiveResultSets=True;"/>
       <Setting name="TablesForHistoricLoad" value="UserOffers,GeneralUsers,GeneralUserSettings,Devices,Accounts,VehiclesV2,FavouriteLocations,Reminders,ReminderTypes,Location,UserMotoristTypes,Promotions,Countries,Languages,UnitsOfMeasurements,UserTypes,Genders,Applications"/>
       <Setting name="TablesForDeltaLoad" value="UserOffers,UserSurvey,TermsAndConditionsV2,DeviceUserApplicationLog,GeneralUsers,GeneralUserSettings,Devices,Accounts,VehiclesV2,FavouriteLocations,Reminders,DashboardOrderLogs,UserMotoristTypes,Promotions"/>
-      <Setting name="RoleInterval" value="10000"/>
-      <Setting name="DeltaLoadInterval" value="20"/>
+      <Setting name="RoleInterval" value="9600000"/>
       <Setting name ="MaxParallelProcessCount" value="4"/>
       <Setting name="EncryptionCert" value="7B73182CAA080D466244DC2720CF3CC4B461B7CF" />
     </ConfigurationSettings>

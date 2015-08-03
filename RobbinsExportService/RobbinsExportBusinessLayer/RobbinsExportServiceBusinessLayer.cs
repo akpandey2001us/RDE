@@ -1,41 +1,41 @@
-﻿using Microsoft.Practices.EnterpriseLibrary.WindowsAzure.TransientFaultHandling.SqlAzure;
-using Microsoft.Practices.TransientFaultHandling;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Data.SqlClient;
 using System.Text;
-using System.Linq;
 
 namespace RobbinsExportBusinessLayer
 {
-	public class RobbinsExportServiceBusinessLayer : IQueryExecution, IEntitiesOperations, IDisposable
+    /// <summary>
+    /// Data export business layer
+    /// </summary>
+	public class RobbinsExportServiceBusinessLayer :  IEntitiesOperations, IDisposable
 	{
 		private string SQLSourceDBConnectionString;
         private string SQLTargetDBConnectionString;
         private int loadCTVersion = 0;
+        private DatabaseQueryExecution dbExecution = new DatabaseQueryExecution();
 
-		private RetryPolicy SQLRetryConnection
-		{
-			get
-			{
-				RetryPolicy retryPolicy = new RetryPolicy<SqlAzureTransientErrorDetectionStrategy>(3);
-				return retryPolicy;
-			}
-		}
-
+        /// <summary>
+        /// Constuctor with initialization for source and destination database
+        /// </summary>
+        /// <param name="connectionStringForSourceDB">source database connection string</param>
+        /// <param name="connectionStringForTargetDB">target database connection string</param>
 		public RobbinsExportServiceBusinessLayer(string connectionStringForSourceDB, string connectionStringForTargetDB)
 		{
             SQLSourceDBConnectionString = connectionStringForSourceDB;
             SQLTargetDBConnectionString = connectionStringForTargetDB;
 		}
 
+        /// <summary>
+        /// Get all the database entities
+        /// </summary>
+        /// <returns>List of entities</returns>
         public List<string> GetAllEntities()
 		{
 			List<string> tableNames = new List<string>();
 
 			string sql = "select * from sysobjects where xtype = 'U'";
-            var tables = ExecuteSQLCommand(sql, "AllEntities", SQLSourceDBConnectionString);
+            var tables = dbExecution.ExecuteSQLCommand(sql, "AllEntities", SQLSourceDBConnectionString);
 
 			for (int i = 0; i < tables.Rows.Count; i++)
 			{
@@ -45,29 +45,21 @@ namespace RobbinsExportBusinessLayer
 			return tableNames;
 		}
 
-        public List<string> GetColumns(string tableName)
-        {
-            List<string> columnList = new List<string>();
-            string sql = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '" + tableName + "'";
-            var sqlData = ExecuteSQLCommand(sql, tableName, SQLSourceDBConnectionString);
-
-            for (int i = 0; i < sqlData.Rows.Count; i++)
-            {
-                columnList.Add(sqlData.Rows[i][0].ToString());
-            }
-
-            return columnList;
-        }
-
+        /// <summary>
+        /// Column mapping between source and destination database table
+        /// </summary>
+        /// <param name="sourceTableName">source table name</param>
+        /// <param name="destinationTableName">destination table name</param>
+        /// <returns>Dictionary object</returns>
         public Dictionary<string, string> GetColumns(string sourceTableName, string destinationTableName)
         {
             Dictionary<string,string> columnList = new Dictionary<string, string>();
             string sqlSource = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '" + sourceTableName + "'";
-            var sqlSourceDataCols = ExecuteSQLCommand(sqlSource, sourceTableName, SQLSourceDBConnectionString);
+            var sqlSourceDataCols = dbExecution.ExecuteSQLCommand(sqlSource, sourceTableName, SQLSourceDBConnectionString);
             sqlSourceDataCols.Rows.Add("CDC_Type");
 
             string sqlDestination = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '" + destinationTableName + "'";
-            var sqlDestinationDataCols = ExecuteSQLCommand(sqlDestination, sourceTableName, SQLTargetDBConnectionString);
+            var sqlDestinationDataCols = dbExecution.ExecuteSQLCommand(sqlDestination, sourceTableName, SQLTargetDBConnectionString);
 
             for (int i = 0; i < sqlSourceDataCols.Rows.Count; i++)
             {
@@ -77,17 +69,23 @@ namespace RobbinsExportBusinessLayer
             return columnList;
         }
 
+        /// <summary>
+        /// Verify if the table exists into database
+        /// </summary>
+        /// <param name="tableName">table name</param>
+        /// <param name="connectionString">connection string</param>
+        /// <returns>success flag</returns>
         public bool IsTableExists(string tableName, string connectionString)
 		{
 			string tableExistsSql = string.Format("SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = N'{0}'", tableName);
-            var result = ExecuteSQLCommand(tableExistsSql, "RowsCount", connectionString);
+            var result = dbExecution.ExecuteSQLCommand(tableExistsSql, "RowsCount", connectionString);
             return result.Rows.Count > 0;
 		}
 
         public DataTable GetPrimaryKeyColumns(string tableName)
         {
             string primaryKeyFinderSql = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE OBJECTPROPERTY(OBJECT_ID(constraint_name), 'IsPrimaryKey') = 1 AND table_name = '" + tableName + "'";
-            var tablePKDefn = ExecuteSQLCommand(primaryKeyFinderSql, tableName, SQLSourceDBConnectionString);
+            var tablePKDefn = dbExecution.ExecuteSQLCommand(primaryKeyFinderSql, tableName, SQLSourceDBConnectionString);
 
             return tablePKDefn;
         }
@@ -95,7 +93,7 @@ namespace RobbinsExportBusinessLayer
         private string GetTableDefinition(string tableName)
 		{
 			string sql = "SELECT ORDINAL_POSITION, COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '" + tableName + "'";
-            var tableDefn = ExecuteSQLCommand(sql, tableName, SQLSourceDBConnectionString);
+            var tableDefn = dbExecution.ExecuteSQLCommand(sql, tableName, SQLSourceDBConnectionString);
 
 			var tablePKDefn = this.GetPrimaryKeyColumns(tableName);
 
@@ -120,47 +118,64 @@ namespace RobbinsExportBusinessLayer
 			return sb.ToString();
 		}
 
-		public DataTable GetEntityWithData(string tableName, string loadType = "F")
+        /// <summary>
+        /// Get the table data to export
+        /// Add additional column CDC_Type
+        /// </summary>
+        /// <param name="tableName">table name</param>
+        /// <returns>DataTable object</returns>
+		public DataTable GetEntityWithData(string tableName)
 		{
 			string sql = string.Format("select * from {0}", tableName);
-            var result = ExecuteSQLCommand(sql, tableName, SQLSourceDBConnectionString);
-            if (loadType == "F")
+            var result = dbExecution.ExecuteSQLCommand(sql, tableName, SQLSourceDBConnectionString);
+            
+            result.Columns.Add("CDC_Type");
+
+            for (int i = 0; i < result.Rows.Count; i++)
             {
-                result.Columns.Add("CDC_Type");
-
-                for (int i = 0; i < result.Rows.Count; i++)
-                {
-                    result.Rows[i]["CDC_Type"] = "F";
-                }
+                result.Rows[i]["CDC_Type"] = "F";
             }
-
+            
             return result;
 		}
 
+        /// <summary>
+        /// Truncate data in table
+        /// </summary>
+        /// <param name="tableName">table name</param>
+        /// <returns>success flag</returns>
         public bool TruncateEntity(string tableName)
 		{
 			string sql = string.Format("TRUNCATE TABLE {0}", tableName);
-            return ExecuteSQLCommand(sql, SQLTargetDBConnectionString) > 0;
+            return dbExecution.ExecuteSQLCommand(sql, SQLTargetDBConnectionString) > 0;
 		}
 
+        /// <summary>
+        /// Create table
+        /// </summary>
+        /// <param name="tableName"></param>
         public void CreateEntity(string tableName)
         {
             var tableDefinition = GetTableDefinition(tableName);
             string sql = string.Format("exec sp_executesql {0}", tableDefinition);
-            ExecuteSQLCommand(sql, SQLTargetDBConnectionString);
+            dbExecution.ExecuteSQLCommand(sql, SQLTargetDBConnectionString);
         }
 
-        public int InsertLoadStatusAndReturnId(
-            int? loadFirstCTVersion,
-            DateTime? loadFromDateTime,
-            int? load_lastCTVersion,
-            DateTime? loadToDateTime,
-            char? loadStatusCode,
-            char? loadTypeCode)
+        /// <summary>
+        /// Insert a row into LoadStatusLog table
+        /// </summary>
+        /// <returns>return the inserted id</returns>
+        public int InsertLoadStatusAndReturnId()
         {
-            var lastRecord = ExecuteSQLCommand("select top 1 * from LoadStatusLog order by load_Id desc", "LoadStatusLog", SQLTargetDBConnectionString);
+            int loadFirstCTVersion = -1;
+            DateTime loadFromDateTime = DateTime.UtcNow;
+            int load_lastCTVersion = -1;
+            DateTime loadToDateTime = DateTime.UtcNow;
+            char loadTypeCode = 'D';
 
-            var lastCTVersion = Convert.ToInt32(ExecuteSQLCommand("select CHANGE_TRACKING_CURRENT_VERSION()", "LastCTVersion", SQLSourceDBConnectionString).Rows[0][0].ToString());
+            var lastRecord = dbExecution.ExecuteSQLCommand("select top 1 * from LoadStatusLog order by load_Id desc", "LoadStatusLog", SQLTargetDBConnectionString);
+
+            var lastCTVersion = Convert.ToInt32(dbExecution.ExecuteSQLCommand("select CHANGE_TRACKING_CURRENT_VERSION()", "LastCTVersion", SQLSourceDBConnectionString).Rows[0][0].ToString());
 
             if (lastRecord.Rows.Count > 0 && (lastRecord.Rows[0]["Load_Status_Code"].ToString() == "B" || lastRecord.Rows[0]["Load_Status_Code"].ToString() == "F"))
             {
@@ -168,7 +183,8 @@ namespace RobbinsExportBusinessLayer
                 loadFromDateTime = Convert.ToDateTime(lastRecord.Rows[0]["Load_From_Datetime"].ToString());
                 load_lastCTVersion = lastCTVersion;
                 loadToDateTime = DateTime.UtcNow;
-                this.loadCTVersion = load_lastCTVersion.Value;
+                loadTypeCode = 'D';
+                this.loadCTVersion = Convert.ToInt32(lastRecord.Rows[0]["Load_First_CT_Version"].ToString());
             }
             
             if (lastRecord.Rows.Count > 0 && lastRecord.Rows[0]["Load_Status_Code"].ToString() == "S")
@@ -177,16 +193,18 @@ namespace RobbinsExportBusinessLayer
                 loadFromDateTime = Convert.ToDateTime(lastRecord.Rows[0]["Load_To_Datetime"].ToString());
                 load_lastCTVersion = lastCTVersion;
                 loadToDateTime = DateTime.UtcNow;
-                this.loadCTVersion = lastCTVersion;
+                loadTypeCode = 'D';
+                this.loadCTVersion = Convert.ToInt32(lastRecord.Rows[0]["Load_Last_CT_Version"].ToString());
             }
 
-            if (lastRecord.Rows.Count == 0 || lastRecord.Rows[0]["Load_Status_Code"].ToString() == "I" || lastRecord.Rows[0]["Load_Status_Code"].ToString() == "R")
+            if (lastRecord.Rows.Count == 0 || lastRecord.Rows[0]["Load_Status_Code"].ToString() == "I")
             {
                 loadFirstCTVersion = -1;
                 loadFromDateTime = DateTime.UtcNow;
                 load_lastCTVersion = lastCTVersion;
                 loadToDateTime = DateTime.UtcNow;
                 this.loadCTVersion = -1;
+                loadTypeCode = 'H';
             }
 
             var sql = string.Format("INSERT INTO LoadStatusLog([Load_First_CT_Version],[Load_From_Datetime],[Load_Last_CT_Version],[Load_To_Datetime],[Load_Status_Code],[Load_Type_Code]) VALUES({0},CONVERT(datetime,'{1}',103),{2},CONVERT(datetime,'{3}',103),'{4}','{5}')",
@@ -194,23 +212,31 @@ namespace RobbinsExportBusinessLayer
                 loadFromDateTime,
                 load_lastCTVersion,
                 loadToDateTime,
-                loadStatusCode,
+                'P',
                 loadTypeCode);
 
-            ExecuteSQLCommand(sql, SQLTargetDBConnectionString);
+            dbExecution.ExecuteSQLCommand(sql, SQLTargetDBConnectionString);
 
-            var data = ExecuteSQLCommand("select top 1 load_Id from LoadStatusLog order by load_Id desc", "LoadStatusLog", SQLTargetDBConnectionString);
-                    
-            var loadId = data.Rows[0][0]
+            var result = dbExecution.ExecuteSQLCommand("select top 1 load_Id from LoadStatusLog order by load_Id desc", "LoadStatusLog", SQLTargetDBConnectionString);
+
+            var loadId = result.Rows[0][0]
                 .ToString();
 
             return Convert.ToInt32(loadId);
         }
 
+        /// <summary>
+        /// Update the LoadStatusLog table once load is completed or failed
+        /// </summary>
+        /// <param name="loadToDateTime">Load completed datetime</param>
+        /// <param name="loadStatusCode">load status code</param>
+        /// <param name="loadType">load type</param>
+        /// <param name="load_Id">load Id</param>
+        /// <returns>success flag</returns>
         public bool UpdateLoadStatusLog(
-            DateTime? loadToDateTime,
-            char? loadStatusCode,
-            char? loadType,
+            DateTime loadToDateTime,
+            char loadStatusCode,
+            char loadType,
             int load_Id
             )
         {
@@ -220,22 +246,31 @@ namespace RobbinsExportBusinessLayer
                 loadType,
                 load_Id);
 
-            return ExecuteSQLCommand(sql, SQLTargetDBConnectionString) > 0;
+            return dbExecution.ExecuteSQLCommand(sql, SQLTargetDBConnectionString) > 0;
         }
 
-        public string GetLastColumnValueFromLoadStatus(string column)
+        /// <summary>
+        /// Get the last inserted column from LoadStatusLog table
+        /// </summary>
+        /// <param name="column">column name</param>
+        /// <returns>string value for column</returns>
+        public string GetLastInsertedColumnValueFromLoadStatusLogTable(string column)
         {
             string sql = "select top 1 " + column + " from LoadStatusLog order by Load_Id desc";
-            var loadStatus = ExecuteSQLCommand(sql, "LoadStatusLog", SQLTargetDBConnectionString);
+            var loadStatus = dbExecution.ExecuteSQLCommand(sql, "LoadStatusLog", SQLTargetDBConnectionString);
             
             return loadStatus.Rows.Count > 0 ? loadStatus.Rows[0][0].ToString() : null;
         }
 
+        /// <summary>
+        /// Get the tables with delta changes
+        /// </summary>
+        /// <returns></returns>
         public List<string> GetTablesWithValidDeltaChanges()
         {
             List<string> tables = new List<string>();
             string sql = string.Format("select name from sys.objects where object_id in (select object_Id from sys.change_tracking_tables where min_valid_version <= {0}) and [type] = 'U'", this.loadCTVersion);
-            var deltaTables = ExecuteSQLCommand(sql, "DeltaTables", SQLSourceDBConnectionString);
+            var deltaTables = dbExecution.ExecuteSQLCommand(sql, "DeltaTables", SQLSourceDBConnectionString);
             for (int i = 0; i < deltaTables.Rows.Count; i++)
             {
                 tables.Add(deltaTables.Rows[i][0].ToString());
@@ -244,6 +279,11 @@ namespace RobbinsExportBusinessLayer
             return tables;
         }
 
+        /// <summary>
+        /// Get table with delta changes
+        /// </summary>
+        /// <param name="tableName"></param>
+        /// <returns></returns>
         public DataTable GetTableDataWithDeltaChanges(string tableName)
         {
             var primaryKeys = this.GetPrimaryKeyColumns(tableName);
@@ -269,17 +309,17 @@ namespace RobbinsExportBusinessLayer
                 queryBuilder.Append(" and ");
             }
 
-            var result = ExecuteSQLCommand(queryBuilder.ToString(), "DeltaChanges", SQLSourceDBConnectionString);
+            var result = dbExecution.ExecuteSQLCommand(queryBuilder.ToString(), "DeltaChanges", SQLSourceDBConnectionString);
             
             return result;
         }
 
-        public DateTime GetLastHistoricLoadDateTime()
-        {
-            string sql = "select top 1 Load_To_DateTime from LoadStatusLog where Load_Type_Code = 'F' and Load_Status_Code = 'S' order by Load_Id desc";
-            return Convert.ToDateTime(ExecuteSQLCommand(sql, "SqlToDisableIndex", SQLTargetDBConnectionString).Rows[0][0].ToString());
-        }
-
+        /// <summary>
+        /// Decrypt the account table records
+        /// </summary>
+        /// <param name="accounts"></param>
+        /// <param name="cert"></param>
+        /// <returns></returns>
         public DataTable DecryptAccountRecords(DataTable accounts, string cert)
         {
             for (int i = 0; i < accounts.Rows.Count; i++)
@@ -291,54 +331,9 @@ namespace RobbinsExportBusinessLayer
             return accounts;
         }
 
-		public DataTable ExecuteSQLCommand(string query, string tableName, string connectionString)
-		{
-			using (SqlConnection cnn = new SqlConnection
-                  (connectionString))
-			{
-				return SQLRetryConnection.ExecuteAction(() =>
-					{
-						SqlCommand cmd =
-						new SqlCommand(query, cnn);
-
-						SqlDataAdapter da = new SqlDataAdapter(cmd);
-
-						DataTable dt = new DataTable(tableName);
-
-						da.Fill(dt);
-
-						return dt;
-					});
-			}
-		}
-
         /// <summary>
-        /// 
+        /// Dispose global objects
         /// </summary>
-        /// <param name="query"></param>
-        /// <param name="connectionString"></param>
-        /// <returns></returns>
-        public int ExecuteSQLCommand(string query, string connectionString)
-		{
-			using (SqlConnection cnn = new SqlConnection
-                  (connectionString))
-			{
-				return SQLRetryConnection.ExecuteAction(() =>
-					{
-						SqlCommand cmd =
-						   new SqlCommand(query, cnn);
-
-                        cnn.Open();
-
-						var result = cmd.ExecuteNonQuery();
-
-                        cnn.Close();
-
-                        return result;
-					});
-			}
-		}
-
         public void Dispose()
         {
             SQLSourceDBConnectionString = null;

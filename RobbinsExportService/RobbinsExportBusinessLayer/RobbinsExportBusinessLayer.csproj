@@ -68,6 +68,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="DatabaseQueryExecution.cs" />
     <Compile Include="DataDecryptionLayer.cs" />
     <Compile Include="IEntitiesOperations.cs" />
     <Compile Include="IQueryExecution.cs" />
