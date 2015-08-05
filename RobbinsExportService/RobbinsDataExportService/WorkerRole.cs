@@ -27,7 +27,8 @@ namespace RobbinsDataExportService
 				CloudConfigurationManager.GetSetting("TargetDatabaseConnectionString")
 			);
 		private List<string> fullLoadTables = new List<string>();
-		private List<string> deltaLoadTables = new List<string>();
+        private List<string> referenceTables = new List<string>();
+		private List<string> transactionTables = new List<string>();
 		private List<string> entities = new List<string>();
         private int maxParallelThread = -1;
 
@@ -64,7 +65,8 @@ namespace RobbinsDataExportService
             this.maxParallelThread = Convert.ToInt32(CloudConfigurationManager.GetSetting("MaxParallelProcessCount"));
 
 			fullLoadTables.AddRange(CloudConfigurationManager.GetSetting("TablesForHistoricLoad").Split(new char[] { ',' }));
-			deltaLoadTables.AddRange(CloudConfigurationManager.GetSetting("TablesForDeltaLoad").Split(new char[] { ',' }));
+            referenceTables.AddRange(CloudConfigurationManager.GetSetting("ReferenceTables").Split(new char[] { ',' }));
+            transactionTables.AddRange(CloudConfigurationManager.GetSetting("TransactionTables").Split(new char[] { ',' }));
 
 			// 1. Get all the sql server tables
 			entities = businessLayer.GetAllEntities();
@@ -208,43 +210,49 @@ namespace RobbinsDataExportService
 			try
 			{
 				// 2. Start processing data for Historic load into replica database
-				Parallel.ForEach(deltaLoadTables, new ParallelOptions() { MaxDegreeOfParallelism = maxParallelThread }, (entity) =>
+				Parallel.ForEach(entities, new ParallelOptions() { MaxDegreeOfParallelism = maxParallelThread }, (entity) =>
 				{
 					// truncate all the existing data to avoid duplication
 					if (businessLayer.IsTableExists(entity, CloudConfigurationManager.GetSetting("TargetDatabaseConnectionString")))
 					{
-						Trace.WriteLine(string.Format("Truncating data for entity {0}", entity));
-
-						businessLayer.TruncateEntity(entity);
-
-						Trace.WriteLine(string.Format("Processing data for entity {0}", entity));
-
 						// pull all the data into in-memory datatable
 						// TODO: need to check the performance 
 						DataTable entityData = new DataTable();
 
-						if (validDeltaTables.Contains(entity))
+						if (transactionTables.Contains(entity) && validDeltaTables.Contains(entity))
 						{
+                            this.TruncateEntityData(entity);
+
+                            Trace.WriteLine(string.Format("Processing data for entity {0}", entity));
+
 							// get delta changes
 							entityData = businessLayer.GetTableDataWithDeltaChanges(entity);
                             delta = true;
 						}
-						else
+					   
+                        if(referenceTables.Contains(entity))
 						{
+                            this.TruncateEntityData(entity);
+
+                            Trace.WriteLine(string.Format("Processing data for entity {0}", entity));
+
 							// get full load, no valid delta for this entity
 							entityData = businessLayer.GetEntityWithData(entity);
 						}
 
-						if (entity == "Accounts")
+						if (entity == "Accounts" && entityData.Rows.Count > 0)
 						{
 							entityData = businessLayer.DecryptAccountRecords(entityData, CloudConfigurationManager.GetSetting("EncryptionCert"));
 						}
 
-						// write data to destination table
-						BulkWriter tableWriter = new BulkWriter(entity, businessLayer.GetColumns(entity, entity));
-						tableWriter.WriteWithRetries(entityData);
+                        if (entityData.Rows.Count > 0)
+                        {
+                            // write data to destination table
+                            BulkWriter tableWriter = new BulkWriter(entity, businessLayer.GetColumns(entity, entity));
+                            tableWriter.WriteWithRetries(entityData);
 
-						Trace.WriteLine(string.Format("Data written for entity {0}", entity));
+                            Trace.WriteLine(string.Format("Data written for entity {0}", entity));
+                        }
 					}
 				});
 			}
@@ -255,6 +263,17 @@ namespace RobbinsDataExportService
 
 			// 3. Update the load_status_details table
 			businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, 'R', delta == true ? 'D': 'H', loadId);
+        }
+
+        /// <summary>
+        /// Truncate the entity data
+        /// </summary>
+        /// <param name="tableName">table name</param>
+        private void TruncateEntityData(string tableName)
+        {
+            Trace.WriteLine(string.Format("Truncating data for entity {0}", tableName));
+
+            businessLayer.TruncateEntity(tableName);
         }
 
         #endregion

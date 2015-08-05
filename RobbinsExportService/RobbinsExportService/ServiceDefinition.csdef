@@ -5,7 +5,8 @@
       <Setting name="SourceDatabaseConnectionString" />
       <Setting name="TargetDatabaseConnectionString" />
       <Setting name="TablesForHistoricLoad" />
-      <Setting name="TablesForDeltaLoad" />
+      <Setting name="TransactionTables" />
+      <Setting name="ReferenceTables" />
       <Setting name="RoleInterval" />
       <Setting name ="MaxParallelProcessCount" />
       <Setting name="EncryptionCert" />
