@@ -30,8 +30,7 @@ namespace RobbinsDataExportService
         private List<string> referenceTables = new List<string>();
 		private List<string> transactionTables = new List<string>();
 		private List<string> entities = new List<string>();
-        private int maxParallelThread = -1;
-
+        private int maxParallelThread = 0;
         /// <summary>
         /// Method to called always while the Role instance is running
         /// </summary>
@@ -62,14 +61,7 @@ namespace RobbinsDataExportService
 
 			Trace.TraceInformation("RobbinsDataExportService has been started");
 
-            this.maxParallelThread = Convert.ToInt32(CloudConfigurationManager.GetSetting("MaxParallelProcessCount"));
-
-			fullLoadTables.AddRange(CloudConfigurationManager.GetSetting("TablesForHistoricLoad").Split(new char[] { ',' }));
-            referenceTables.AddRange(CloudConfigurationManager.GetSetting("ReferenceTables").Split(new char[] { ',' }));
-            transactionTables.AddRange(CloudConfigurationManager.GetSetting("TransactionTables").Split(new char[] { ',' }));
-
-			// 1. Get all the sql server tables
-			entities = businessLayer.GetAllEntities();
+            this.PrepareDataExport();
 
             this.RunDataExport();
 
@@ -97,10 +89,31 @@ namespace RobbinsDataExportService
         #region Private Members
 
         /// <summary>
+        /// Prepare the data export operation
+        /// </summary>
+        private void PrepareDataExport()
+        {
+            this.maxParallelThread = Convert.ToInt32(CloudConfigurationManager.GetSetting("MaxParallelProcessCount"));
+
+            fullLoadTables.Clear();
+            referenceTables.Clear();
+            transactionTables.Clear();
+
+            fullLoadTables.AddRange(CloudConfigurationManager.GetSetting("TablesForHistoricLoad").Split(new char[] { ',' }));
+            referenceTables.AddRange(CloudConfigurationManager.GetSetting("ReferenceTables").Split(new char[] { ',' }));
+            transactionTables.AddRange(CloudConfigurationManager.GetSetting("TransactionTables").Split(new char[] { ',' }));
+
+            // 1. Get all the sql server tables
+            entities = businessLayer.GetAllEntities();
+        }
+
+        /// <summary>
         /// Data export method
         /// </summary>
         private void RunDataExport()
         {
+            this.PrepareDataExport();
+
             var lastStatusCode = businessLayer.GetLastInsertedColumnValueFromLoadStatusLogTable("Load_Status_Code");
 
             switch (lastStatusCode)
@@ -130,7 +143,7 @@ namespace RobbinsDataExportService
                 await Task.Delay(Convert.ToInt32(CloudConfigurationManager.GetSetting("RoleInterval")));
                 
 				Trace.WriteLine("Running historic load at " + DateTime.Now);
-
+                
                 this.RunDataExport();
 
 				// 1. Run Historic load on ad-hoc basis
@@ -147,7 +160,7 @@ namespace RobbinsDataExportService
 			int loadId = businessLayer.InsertLoadStatusAndReturnId();
 
 			// ready to load the data
-			businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, 'P', 'F', loadId);
+			businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, 'P', 'H', loadId);
 
 			try
 			{
@@ -167,10 +180,9 @@ namespace RobbinsDataExportService
 						Trace.WriteLine(string.Format("Processing data for entity {0}", entity));
 
 						// pull all the data into in-memory datatable
-						// TODO: need to check the performance 
 						var entityData = businessLayer.GetEntityWithData(entity);
 
-						if (entity == "Accounts")
+						if (entity == "Accounts" && CloudConfigurationManager.GetSetting("IsAccountDecryptionReqd")=="1")
 						{
 							entityData = businessLayer.DecryptAccountRecords(entityData, CloudConfigurationManager.GetSetting("EncryptionCert"));
 						}
@@ -183,8 +195,9 @@ namespace RobbinsDataExportService
 					}
 				});
 			}
-			catch (Exception)
+			catch (Exception ex)
 			{
+                Trace.WriteLine(ex.StackTrace, "Error");
 				businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, 'F', 'H', loadId);
 			}
 
@@ -202,7 +215,6 @@ namespace RobbinsDataExportService
 
             // get the tables with valid delta version
             var validDeltaTables = businessLayer.GetTablesWithValidDeltaChanges();
-            bool delta = false;
 
 			// ready to load the data
 			businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, 'P', 'D', loadId);
@@ -212,35 +224,31 @@ namespace RobbinsDataExportService
 				// 2. Start processing data for Historic load into replica database
 				Parallel.ForEach(entities, new ParallelOptions() { MaxDegreeOfParallelism = maxParallelThread }, (entity) =>
 				{
-					// truncate all the existing data to avoid duplication
 					if (businessLayer.IsTableExists(entity, CloudConfigurationManager.GetSetting("TargetDatabaseConnectionString")))
 					{
 						// pull all the data into in-memory datatable
-						// TODO: need to check the performance 
 						DataTable entityData = new DataTable();
+
+                        this.TruncateEntityData(entity);
+
+                        Trace.WriteLine(string.Format("Processing data for entity {0}", entity));
 
 						if (transactionTables.Contains(entity) && validDeltaTables.Contains(entity))
 						{
-                            this.TruncateEntityData(entity);
-
-                            Trace.WriteLine(string.Format("Processing data for entity {0}", entity));
-
 							// get delta changes
 							entityData = businessLayer.GetTableDataWithDeltaChanges(entity);
-                            delta = true;
 						}
-					   
+
+					    // Reference tables need to copy with full data
+                        // The table set should be mutually exclusive between Reference tables and Transaction tables
                         if(referenceTables.Contains(entity))
 						{
-                            this.TruncateEntityData(entity);
-
-                            Trace.WriteLine(string.Format("Processing data for entity {0}", entity));
-
 							// get full load, no valid delta for this entity
 							entityData = businessLayer.GetEntityWithData(entity);
 						}
 
-						if (entity == "Accounts" && entityData.Rows.Count > 0)
+                        // decrypt the account data
+						if (entity == "Accounts" && entityData.Rows.Count > 0 && CloudConfigurationManager.GetSetting("IsAccountDecryptionReqd")=="1")
 						{
 							entityData = businessLayer.DecryptAccountRecords(entityData, CloudConfigurationManager.GetSetting("EncryptionCert"));
 						}
@@ -256,13 +264,14 @@ namespace RobbinsDataExportService
 					}
 				});
 			}
-			catch (Exception)
+			catch (Exception ex)
 			{
+                Trace.WriteLine(ex.StackTrace, "Error");
 				businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, 'F', 'D', loadId);
 			}
 
 			// 3. Update the load_status_details table
-			businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, 'R', delta == true ? 'D': 'H', loadId);
+			businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, 'R', validDeltaTables.Count > 0 ? 'D' : 'H', loadId);
         }
 
         /// <summary>

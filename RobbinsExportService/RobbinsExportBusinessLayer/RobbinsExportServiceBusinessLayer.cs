@@ -269,7 +269,7 @@ namespace RobbinsExportBusinessLayer
         public List<string> GetTablesWithValidDeltaChanges()
         {
             List<string> tables = new List<string>();
-            string sql = string.Format("select name from sys.objects where object_id in (select object_Id from sys.change_tracking_tables where min_valid_version <= {0}) and [type] = 'U'", this.loadCTVersion);
+            string sql = string.Format("select name from sys.objects where object_id in (select object_Id from sys.change_tracking_tables where min_valid_version <= {0}) and [type] = 'U'", this.loadCTVersion == -1 ? 0 : this.loadCTVersion);
             var deltaTables = dbExecution.ExecuteSQLCommand(sql, "DeltaTables", SQLSourceDBConnectionString);
             for (int i = 0; i < deltaTables.Rows.Count; i++)
             {

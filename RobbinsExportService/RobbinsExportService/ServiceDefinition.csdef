@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <ServiceDefinition name="RobbinsExportService" xmlns="http://schemas.microsoft.com/ServiceHosting/2008/10/ServiceDefinition" schemaVersion="2014-06.2.4">
-  <WorkerRole name="RobbinsDataExportService" vmsize="Small">
+  <WorkerRole name="RobbinsDataExportService" vmsize="Medium">
     <ConfigurationSettings>
       <Setting name="SourceDatabaseConnectionString" />
       <Setting name="TargetDatabaseConnectionString" />
@@ -9,6 +9,7 @@
       <Setting name="ReferenceTables" />
       <Setting name="RoleInterval" />
       <Setting name ="MaxParallelProcessCount" />
+      <Setting name="IsAccountDecryptionReqd" />
       <Setting name="EncryptionCert" />
     </ConfigurationSettings>
     <Certificates>
