@@ -11,11 +11,11 @@ namespace RobbinsExportBusinessLayer
     /// </summary>
 	internal class DatabaseQueryExecution : IQueryExecution
 	{
-		const int MaxRetry = 5;
-		const int DelayMs = 100;
+		private const int MaxRetry = 5;
+		private const int DelayMs = 100;
 
 		/// <summary>
-		/// SQL retry
+		/// SQL connection retry
 		/// </summary>
 		private RetryPolicy SQLRetryConnection
 		{
@@ -31,10 +31,10 @@ namespace RobbinsExportBusinessLayer
 		/// <summary>
 		/// Execute SQL command
 		/// </summary>
-		/// <param name="query"></param>
-		/// <param name="tableName"></param>
-		/// <param name="connectionString"></param>
-		/// <returns></returns>
+		/// <param name="query">Query string</param>
+		/// <param name="tableName">Table name</param>
+		/// <param name="connectionString">Connection string</param>
+		/// <returns>DataTable object</returns>
 		public DataTable ExecuteSQLCommand(string query, string tableName, string connectionString)
 		{
 			using (SqlConnection cnn = new SqlConnection
@@ -59,9 +59,9 @@ namespace RobbinsExportBusinessLayer
 		/// <summary>
 		/// Execute SQL command
 		/// </summary>
-		/// <param name="query"></param>
-		/// <param name="connectionString"></param>
-		/// <returns></returns>
+		/// <param name="query">Sql query string</param>
+		/// <param name="connectionString">connection string</param>
+		/// <returns>number of rows impacted by query</returns>
 		public int ExecuteSQLCommand(string query, string connectionString)
 		{
 			using (SqlConnection cnn = new SqlConnection

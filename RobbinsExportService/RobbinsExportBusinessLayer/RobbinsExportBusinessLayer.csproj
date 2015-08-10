@@ -68,10 +68,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="DatabaseQueryExecution.cs" />
-    <Compile Include="DataDecryptionLayer.cs" />
-    <Compile Include="IEntitiesOperations.cs" />
-    <Compile Include="IQueryExecution.cs" />
+    <Compile Include="Utility\CommonTableScript.cs" />
+    <Compile Include="Implementation\DatabaseQueryExecution.cs" />
+    <Compile Include="Utility\DataDecryptionLayer.cs" />
+    <Compile Include="Service\IEntitiesOperations.cs" />
+    <Compile Include="Service\IQueryExecution.cs" />
     <Compile Include="RobbinsExportServiceBusinessLayer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

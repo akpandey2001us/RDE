@@ -4,6 +4,7 @@ using RobbinsExportBusinessLayer;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Diagnostics;
 using System.Net;
 using System.Threading;
@@ -15,7 +16,7 @@ namespace RobbinsDataExportService
     /// Worker Role class
     /// This will export the data from Robbins database to Robbins replica database
     /// The load status will be P(Preparing) and then R(Ready) after successful data export
-    /// In case it fails, then the final load Status will be F(Fail)
+    /// In case it fails, then the final load Status will be F(Failed)
     /// </summary>
 	public class WorkerRole : RoleEntryPoint
 	{
@@ -31,6 +32,7 @@ namespace RobbinsDataExportService
 		private List<string> transactionTables = new List<string>();
 		private List<string> entities = new List<string>();
         private int maxParallelThread = 0;
+
         /// <summary>
         /// Method to called always while the Role instance is running
         /// </summary>
@@ -61,8 +63,6 @@ namespace RobbinsDataExportService
 
 			Trace.TraceInformation("RobbinsDataExportService has been started");
 
-            this.PrepareDataExport();
-
             this.RunDataExport();
 
 			// 4. Start processing data for Delta load
@@ -80,7 +80,7 @@ namespace RobbinsDataExportService
 
 			this.cancellationTokenSource.Cancel();
 			this.runCompleteEvent.WaitOne();
-
+            this.businessLayer = null;
 			base.OnStop();
 
 			Trace.TraceInformation("RobbinsDataExportService has stopped");
@@ -112,21 +112,53 @@ namespace RobbinsDataExportService
         /// </summary>
         private void RunDataExport()
         {
-            this.PrepareDataExport();
-
-            var lastStatusCode = businessLayer.GetLastInsertedColumnValueFromLoadStatusLogTable("Load_Status_Code");
-
-            switch (lastStatusCode)
+            try
             {
-                case "B":
-                case "S":
-                    this.DeltaLoad();
-                    break;
+                this.PrepareDataExport();
 
-                case null:
-                case "I":
-                    this.InitialLoad();
-                    break;
+                char? lastStatusCode = Convert.ToChar(businessLayer.GetLastInsertedColumnValueFromLoadStatusLogTable("Load_Status_Code"));
+
+                switch (lastStatusCode)
+                {
+                    case (char)LoadStatus.BackTrack:
+                    case (char)LoadStatus.Successful:
+                        this.DeltaLoad();
+                        break;
+
+                    case null:
+                    case (char)LoadStatus.Initialize:
+                        this.InitialLoad();
+                        break;
+
+                    case (char)LoadStatus.Ready:
+                        break;
+                }
+            }
+            catch (ApplicationException ex)
+            {
+                this.LogError(ex);
+            }
+            catch (SqlException ex)
+            {
+                this.LogError(ex);
+            }
+            catch (Exception ex)
+            {
+                this.LogError(ex);
+            }
+        }
+
+        /// <summary>
+        /// Log the error
+        /// </summary>
+        /// <param name="ex">Exception object</param>
+        /// <param name="loadId">load Id</param>
+        private void LogError(Exception ex, int? loadId = null)
+        {
+            Trace.WriteLine(ex.StackTrace, "Error");
+            if (loadId.HasValue)
+            {
+                businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, (char)LoadStatus.Failed, (char)LoadStatusType.Historic, loadId.Value);
             }
         }
 
@@ -160,13 +192,10 @@ namespace RobbinsDataExportService
 			int loadId = businessLayer.InsertLoadStatusAndReturnId();
 
 			// ready to load the data
-			businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, 'P', 'H', loadId);
+			businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, (char)LoadStatus.Preparing, (char)LoadStatusType.Historic, loadId);
 
 			try
 			{
-				// disable indexes
-				// businessLayer.DisableIndexes();
-
 				// 2. Start processing data for Historic load into replica database
 				Parallel.ForEach(entities, new ParallelOptions() { MaxDegreeOfParallelism = maxParallelThread }, (entity) =>
 				{
@@ -195,14 +224,25 @@ namespace RobbinsDataExportService
 					}
 				});
 			}
+            catch(OutOfMemoryException ex)
+            {
+                this.LogError(ex, loadId);
+            }
+            catch(ApplicationException ex)
+            {
+                this.LogError(ex, loadId);
+            }
+            catch(SqlException ex)
+            {
+                this.LogError(ex, loadId);
+            }
 			catch (Exception ex)
 			{
-                Trace.WriteLine(ex.StackTrace, "Error");
-				businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, 'F', 'H', loadId);
+                this.LogError(ex, loadId);
 			}
 
 			// 3. Update the load_status_details table
-			businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, 'R', 'H', loadId);
+			businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, (char)LoadStatus.Ready, (char)LoadStatusType.Historic, loadId);
 		}
 
         /// <summary>
@@ -217,7 +257,7 @@ namespace RobbinsDataExportService
             var validDeltaTables = businessLayer.GetTablesWithValidDeltaChanges();
 
 			// ready to load the data
-			businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, 'P', 'D', loadId);
+			businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, (char)LoadStatus.Preparing, (char)LoadStatusType.Delta, loadId);
 
 			try
 			{
@@ -248,7 +288,7 @@ namespace RobbinsDataExportService
 						}
 
                         // decrypt the account data
-						if (entity == "Accounts" && entityData.Rows.Count > 0 && CloudConfigurationManager.GetSetting("IsAccountDecryptionReqd")=="1")
+						if (entity == "Accounts" && entityData.Rows.Count > 0 && CloudConfigurationManager.GetSetting("IsAccountDecryptionReqd") == "1")
 						{
 							entityData = businessLayer.DecryptAccountRecords(entityData, CloudConfigurationManager.GetSetting("EncryptionCert"));
 						}
@@ -264,14 +304,29 @@ namespace RobbinsDataExportService
 					}
 				});
 			}
+            catch (OutOfMemoryException ex)
+            {
+                this.LogError(ex, loadId);
+            }
+            catch (ApplicationException ex)
+            {
+                this.LogError(ex, loadId);
+            }
+            catch (SqlException ex)
+            {
+                this.LogError(ex, loadId);
+            }
 			catch (Exception ex)
 			{
-                Trace.WriteLine(ex.StackTrace, "Error");
-				businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, 'F', 'D', loadId);
+                this.LogError(ex, loadId);
 			}
 
 			// 3. Update the load_status_details table
-			businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, 'R', validDeltaTables.Count > 0 ? 'D' : 'H', loadId);
+            businessLayer.UpdateLoadStatusLog(
+                DateTime.UtcNow, 
+                (char)LoadStatus.Ready, 
+                validDeltaTables.Count > 0 ? (char)LoadStatusType.Delta : (char)LoadStatusType.Historic, 
+                loadId);
         }
 
         /// <summary>

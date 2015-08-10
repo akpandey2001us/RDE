@@ -6,8 +6,16 @@ using System.Text;
 
 namespace RobbinsExportBusinessLayer
 {
+    /// <summary>
+    /// Decryption Layer for Data
+    /// </summary>
     public class DataDecryptionLayer
     {
+        /// <summary>
+        /// Get the current certificate for decryption
+        /// </summary>
+        /// <param name="certThumb">Certificate Thumb print</param>
+        /// <returns>Certificate object</returns>
         public static X509Certificate2 GetCurrentCertificate(string certThumb)
         {
             if (String.IsNullOrEmpty(certThumb))
@@ -25,6 +33,12 @@ namespace RobbinsExportBusinessLayer
             return certificate;
         }
 
+        /// <summary>
+        /// Get the specific certificate
+        /// </summary>
+        /// <param name="thumbprint">certificate thumbprint</param>
+        /// <param name="validOnly">valid flag</param>
+        /// <returns>certificate object</returns>
         private static X509Certificate2 GetSpecificCertificate(string thumbprint, bool validOnly = true)
         {
             if (String.IsNullOrEmpty(thumbprint))
@@ -60,6 +74,12 @@ namespace RobbinsExportBusinessLayer
             }
         }
 
+        /// <summary>
+        /// Decrypt the data
+        /// </summary>
+        /// <param name="inputString">input string value</param>
+        /// <param name="certificate">certificate object</param>
+        /// <returns>decrypted value</returns>
         public static string Decrypt(string inputString, X509Certificate2 certificate)
         {
             try
@@ -92,6 +112,10 @@ namespace RobbinsExportBusinessLayer
                 }
                 return Encoding.UTF32.GetString(arrayList.ToArray(
                     Type.GetType("System.Byte")) as byte[]);
+            }
+            catch (ApplicationException ex)
+            {
+                throw new ApplicationException(string.Format("The value specified could not be decrypted with the specified certificate, and may have been modified"), ex);
             }
             catch (Exception ex)
             {
