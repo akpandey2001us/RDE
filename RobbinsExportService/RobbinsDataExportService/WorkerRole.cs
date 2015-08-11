@@ -94,6 +94,7 @@ namespace RobbinsDataExportService
         private void PrepareDataExport()
         {
             this.maxParallelThread = Convert.ToInt32(CloudConfigurationManager.GetSetting("MaxParallelProcessCount"));
+            businessLayer.DateTimeFormat = CloudConfigurationManager.GetSetting("DateTimeFormat");
 
             fullLoadTables.Clear();
             referenceTables.Clear();
@@ -116,7 +117,8 @@ namespace RobbinsDataExportService
             {
                 this.PrepareDataExport();
 
-                char? lastStatusCode = Convert.ToChar(businessLayer.GetLastInsertedColumnValueFromLoadStatusLogTable("Load_Status_Code"));
+                var result = businessLayer.GetLastInsertedColumnValueFromLoadStatusLogTable("Load_Status_Code");
+                char? lastStatusCode = result == null ? null : (char?)Convert.ToChar(result);
 
                 switch (lastStatusCode)
                 {
@@ -158,7 +160,7 @@ namespace RobbinsDataExportService
             Trace.WriteLine(ex.StackTrace, "Error");
             if (loadId.HasValue)
             {
-                businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, (char)LoadStatus.Failed, (char)LoadStatusType.Historic, loadId.Value);
+                businessLayer.UpdateLoadStatusLog((char)LoadStatus.Failed, (char)LoadStatusType.Historic, loadId.Value);
             }
         }
 
@@ -192,7 +194,7 @@ namespace RobbinsDataExportService
 			int loadId = businessLayer.InsertLoadStatusAndReturnId();
 
 			// ready to load the data
-			businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, (char)LoadStatus.Preparing, (char)LoadStatusType.Historic, loadId);
+			businessLayer.UpdateLoadStatusLog((char)LoadStatus.Preparing, (char)LoadStatusType.Historic, loadId);
 
 			try
 			{
@@ -242,7 +244,7 @@ namespace RobbinsDataExportService
 			}
 
 			// 3. Update the load_status_details table
-			businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, (char)LoadStatus.Ready, (char)LoadStatusType.Historic, loadId);
+			businessLayer.UpdateLoadStatusLog((char)LoadStatus.Ready, (char)LoadStatusType.Historic, loadId);
 		}
 
         /// <summary>
@@ -257,7 +259,7 @@ namespace RobbinsDataExportService
             var validDeltaTables = businessLayer.GetTablesWithValidDeltaChanges();
 
 			// ready to load the data
-			businessLayer.UpdateLoadStatusLog(DateTime.UtcNow, (char)LoadStatus.Preparing, (char)LoadStatusType.Delta, loadId);
+			businessLayer.UpdateLoadStatusLog((char)LoadStatus.Preparing, (char)LoadStatusType.Delta, loadId);
 
 			try
 			{
@@ -323,7 +325,6 @@ namespace RobbinsDataExportService
 
 			// 3. Update the load_status_details table
             businessLayer.UpdateLoadStatusLog(
-                DateTime.UtcNow, 
                 (char)LoadStatus.Ready, 
                 validDeltaTables.Count > 0 ? (char)LoadStatusType.Delta : (char)LoadStatusType.Historic, 
                 loadId);

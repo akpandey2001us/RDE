@@ -11,6 +11,7 @@
       <Setting name="RoleInterval" value="10000"/>
       <Setting name="MaxParallelProcessCount" value="2"/>
       <Setting name="IsAccountDecryptionReqd" value="0"/>
+      <Setting name="DateTimeFormat" value="yyyy-MM-dd HH:mm:ss"/>
       <Setting name="EncryptionCert" value="7B73182CAA080D466244DC2720CF3CC4B461B7CF" />
     </ConfigurationSettings>
     <Certificates>

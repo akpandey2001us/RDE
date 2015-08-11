@@ -15,6 +15,15 @@ namespace RobbinsExportBusinessLayer
 		private int loadCTVersion = 0;
 		private DatabaseQueryExecution dbExecution;
 
+        /// <summary>
+        /// Date Time format
+        /// </summary>
+        public string DateTimeFormat
+        {
+            get;
+            set;
+        }
+
 		/// <summary>
 		/// Constuctor with initialization for source and destination database
 		/// </summary>
@@ -114,10 +123,8 @@ namespace RobbinsExportBusinessLayer
 			string sql = string.Format("TRUNCATE TABLE {0}", tableName);
 			return dbExecution.ExecuteSQLCommand(sql, SQLTargetDBConnectionString) > 0;
 		}
-
 		
-
-		/// <summary>
+        /// <summary>
 		/// Insert a row into LoadStatusLog table
 		/// </summary>
 		/// <returns>return the inserted id</returns>
@@ -127,7 +134,7 @@ namespace RobbinsExportBusinessLayer
 			DateTime loadFromDateTime = DateTime.UtcNow;
 			int load_lastCTVersion = -1;
 			DateTime loadToDateTime = DateTime.UtcNow;
-			char loadTypeCode = 'D';
+			char loadTypeCode = (char)LoadStatusType.Delta;
 
 			var lastRecord = dbExecution.ExecuteSQLCommand("select top 1 * from LoadStatusLog order by load_Id desc", "LoadStatusLog", SQLTargetDBConnectionString);
 
@@ -139,7 +146,7 @@ namespace RobbinsExportBusinessLayer
 				loadFromDateTime = Convert.ToDateTime(lastRecord.Rows[0]["Load_From_Datetime"].ToString());
 				load_lastCTVersion = lastCTVersion;
 				loadToDateTime = DateTime.UtcNow;
-				loadTypeCode = 'D';
+				loadTypeCode = (char)LoadStatusType.Delta;
 				this.loadCTVersion = Convert.ToInt32(lastRecord.Rows[0]["Load_First_CT_Version"].ToString());
 			}
 
@@ -149,7 +156,7 @@ namespace RobbinsExportBusinessLayer
 				loadFromDateTime = Convert.ToDateTime(lastRecord.Rows[0]["Load_To_Datetime"].ToString());
 				load_lastCTVersion = lastCTVersion;
 				loadToDateTime = DateTime.UtcNow;
-				loadTypeCode = 'D';
+				loadTypeCode = (char)LoadStatusType.Delta;
 				this.loadCTVersion = Convert.ToInt32(lastRecord.Rows[0]["Load_Last_CT_Version"].ToString());
 			}
 
@@ -160,15 +167,15 @@ namespace RobbinsExportBusinessLayer
 				load_lastCTVersion = lastCTVersion;
 				loadToDateTime = DateTime.UtcNow;
 				this.loadCTVersion = -1;
-				loadTypeCode = 'H';
+				loadTypeCode = (char)LoadStatusType.Historic;
 			}
 
 			var sql = string.Format("INSERT INTO LoadStatusLog([Load_First_CT_Version],[Load_From_Datetime],[Load_Last_CT_Version],[Load_To_Datetime],[Load_Status_Code],[Load_Type_Code]) VALUES({0},CONVERT(datetime,'{1}',103),{2},CONVERT(datetime,'{3}',103),'{4}','{5}')",
 				this.loadCTVersion,
-				loadFromDateTime,
+                loadFromDateTime.ToString(this.DateTimeFormat),
 				load_lastCTVersion,
-				loadToDateTime,
-				'P',
+                loadToDateTime.ToString(this.DateTimeFormat),
+				(char)LoadStatus.Preparing,
 				loadTypeCode);
 
 			dbExecution.ExecuteSQLCommand(sql, SQLTargetDBConnectionString);
@@ -190,14 +197,13 @@ namespace RobbinsExportBusinessLayer
 		/// <param name="load_Id">load Id</param>
 		/// <returns>success flag</returns>
 		public bool UpdateLoadStatusLog(
-			DateTime loadToDateTime,
 			char loadStatusCode,
 			char loadType,
 			int load_Id
 			)
 		{
 			var sql = string.Format("UPDATE LoadStatusLog SET [Load_To_Datetime] = CONVERT(datetime,'{0}',103), [Load_Status_Code] = '{1}', [Load_Type_Code]='{2}' WHERE Load_Id = {3}",
-				loadToDateTime,
+                DateTime.UtcNow.ToString(this.DateTimeFormat),
 				loadStatusCode,
 				loadType,
 				load_Id);

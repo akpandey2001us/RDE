@@ -10,6 +10,7 @@
       <Setting name="RoleInterval" />
       <Setting name ="MaxParallelProcessCount" />
       <Setting name="IsAccountDecryptionReqd" />
+      <Setting name="DateTimeFormat" />
       <Setting name="EncryptionCert" />
     </ConfigurationSettings>
     <Certificates>

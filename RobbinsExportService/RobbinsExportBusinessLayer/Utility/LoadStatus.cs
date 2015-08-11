@@ -1,9 +1,9 @@
 ﻿using System;
 
-namespace RobbinsDataExportService
+namespace RobbinsExportBusinessLayer
 {
     [FlagsAttribute]
-    enum LoadStatus
+    public enum LoadStatus
     {
         Preparing = 'P',
         Ready = 'R',
@@ -14,7 +14,7 @@ namespace RobbinsDataExportService
     };
 
     [FlagsAttribute]
-    enum LoadStatusType
+    public enum LoadStatusType
     {
         Historic = 'H',
         Delta = 'D'
