@@ -10,6 +10,9 @@ using System.Linq;
 
 namespace RobbinsDataExportService
 {
+    /// <summary>
+    /// Bulk writer class
+    /// </summary>
     public class BulkWriter
     {
         const int MaxRetry = 5;
@@ -25,16 +28,24 @@ namespace RobbinsDataExportService
             this.tableName = tableName;
             this.tableMap = tableMap;
 
-            // get your connection string
+            // get target database connection string
             connString = CloudConfigurationManager
                 .GetSetting("TargetDatabaseConnectionString");
         }
 
+        /// <summary>
+        /// Write with retry
+        /// </summary>
+        /// <param name="datatable">datatable object</param>
         public void WriteWithRetries(DataTable datatable)
         {
             TryWrite(datatable);
         }
 
+        /// <summary>
+        /// Write data into server
+        /// </summary>
+        /// <param name="datatable">DataTable object</param>
         private void TryWrite(DataTable datatable)
         {
             var policy = MakeRetryPolicy();
@@ -46,10 +57,14 @@ namespace RobbinsDataExportService
             {
                 //logging
                 Trace.TraceError(ex.ToString());
-                throw;
+                throw new Exception(ex.Message);
             }
         }
 
+        /// <summary>
+        /// Write the data table
+        /// </summary>
+        /// <param name="datatable">DataTable object</param>
         private void Write(DataTable datatable)
         {
             // connect to SQL
@@ -58,7 +73,7 @@ namespace RobbinsDataExportService
             {
                 var bulkCopy = MakeSqlBulkCopy(connection);
 
-                // set the destination table name
+                // write into destination table
                 connection.Open();
 
                 using (var dataTableReader = new DataTableReader(datatable))
@@ -70,6 +85,10 @@ namespace RobbinsDataExportService
             }
         }
 
+        /// <summary>
+        /// Retry policy
+        /// </summary>
+        /// <returns>RetryPolicy object</returns>
         private RetryPolicy<SqlAzureTransientErrorDetectionStrategy> MakeRetryPolicy()
         {
             var fromMilliseconds = TimeSpan.FromMilliseconds(DelayMs);
@@ -78,6 +97,11 @@ namespace RobbinsDataExportService
             return policy;
         }
 
+        /// <summary>
+        /// Create SQL Bulk copy
+        /// </summary>
+        /// <param name="connection">connection object</param>
+        /// <returns>SQL Bulk copy object</returns>
         private SqlBulkCopy MakeSqlBulkCopy(SqlConnection connection)
         {
             var bulkCopy =

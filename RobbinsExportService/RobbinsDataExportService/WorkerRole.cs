@@ -63,10 +63,8 @@ namespace RobbinsDataExportService
 
 			Trace.TraceInformation("RobbinsDataExportService has been started");
 
+            // 4. Start processing data for Delta load
             this.RunDataExport();
-
-			// 4. Start processing data for Delta load
-			// 5. If OnStart method is called, then it will start with Historic load always
 
 			return result;
 		}
@@ -157,7 +155,8 @@ namespace RobbinsDataExportService
         /// <param name="loadId">load Id</param>
         private void LogError(Exception ex, int? loadId = null)
         {
-            Trace.WriteLine(ex.StackTrace, "Error");
+            Trace.TraceError(ex.StackTrace);
+
             if (loadId.HasValue)
             {
                 businessLayer.UpdateLoadStatusLog((char)LoadStatus.Failed, (char)LoadStatusType.Historic, loadId.Value);
@@ -177,11 +176,10 @@ namespace RobbinsDataExportService
                 await Task.Delay(Convert.ToInt32(CloudConfigurationManager.GetSetting("RoleInterval")));
                 
 				Trace.WriteLine("Running historic load at " + DateTime.Now);
-                
-                this.RunDataExport();
 
-				// 1. Run Historic load on ad-hoc basis
-				// 2. Start processing data for Delta load            
+                // 1. Run Historic load on ad-hoc basis
+                // 2. Start processing data for Delta load after successful Historic Load after specified interval       
+                this.RunDataExport();    
 			}
 		}
 
