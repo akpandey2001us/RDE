@@ -170,7 +170,7 @@ namespace RobbinsExportBusinessLayer
 				loadTypeCode = (char)LoadStatusType.Historic;
 			}
 
-			var sql = string.Format("INSERT INTO LoadStatusLog([Load_First_CT_Version],[Load_From_Datetime],[Load_Last_CT_Version],[Load_To_Datetime],[Load_Status_Code],[Load_Type_Code]) VALUES({0},CONVERT(datetime,'{1}',103),{2},CONVERT(datetime,'{3}',103),'{4}','{5}')",
+			var sql = string.Format("INSERT INTO LoadStatusLog([Load_First_CT_Version],[Load_From_Datetime],[Load_Last_CT_Version],[Load_To_Datetime],[Load_Status_Code],[Load_Type_Code]) VALUES({0},CONVERT(datetime,'{1}'),{2},CONVERT(datetime,'{3}'),'{4}','{5}')",
 				this.loadCTVersion,
                 loadFromDateTime.ToString(this.DateTimeFormat),
 				load_lastCTVersion,
@@ -202,7 +202,7 @@ namespace RobbinsExportBusinessLayer
 			int load_Id
 			)
 		{
-			var sql = string.Format("UPDATE LoadStatusLog SET [Load_To_Datetime] = CONVERT(datetime,'{0}',103), [Load_Status_Code] = '{1}', [Load_Type_Code]='{2}' WHERE Load_Id = {3}",
+			var sql = string.Format("UPDATE LoadStatusLog SET [Load_To_Datetime] = CONVERT(datetime,'{0}'), [Load_Status_Code] = '{1}', [Load_Type_Code]='{2}' WHERE Load_Id = {3}",
                 DateTime.UtcNow.ToString(this.DateTimeFormat),
 				loadStatusCode,
 				loadType,
