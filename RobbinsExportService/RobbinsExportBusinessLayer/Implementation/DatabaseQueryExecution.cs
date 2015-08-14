@@ -72,13 +72,15 @@ namespace RobbinsExportBusinessLayer
 					SqlCommand cmd =
 					   new SqlCommand(query, cnn);
 
-					cnn.Open();
-
-					var result = cmd.ExecuteNonQuery();
-
-					cnn.Close();
-
-					return result;
+                    try
+                    {
+                        cnn.Open();
+                        return cmd.ExecuteNonQuery();
+                    }
+                    finally
+                    {
+                        cnn.Close();
+                    }
 				});
 			}
 		}
